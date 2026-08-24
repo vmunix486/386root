@@ -1,0 +1,89 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Buildroot <buildroot@buildroot.org>
+Date: Thu, 01 Jan 2026 00:00:00 +0000
+Subject: [PATCH] lib: fix build with glibc >= 2.28
+
+Fix multiple build failures when building m4 1.4.17 against glibc >= 2.28:
+
+1. c-stack.c: SIGSTKSZ is no longer a preprocessor constant (it calls
+   sysconf()), breaking the #elif check. Replace with unconditional define.
+
+2. freadahead.c / fseeko.c: _IO_ftrylockfile is no longer exported and
+   __GNU_LIBRARY__ is 6 (not 1). Add '|| defined __GLIBC__' so the
+   glibc code path is taken.
+
+3. freadahead.c: _IO_IN_BACKUP is no longer defined in public headers.
+   Define it to its traditional value (0x100) if missing.
+
+Signed-off-by: Buildroot <buildroot@buildroot.org>
+---
+ lib/c-stack.c    | 10 +---------
+ lib/freadahead.c |  6 ++++++
+ lib/fseeko.c     |  4 ++--
+ 3 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/lib/c-stack.c b/lib/c-stack.c
+--- a/lib/c-stack.c
++++ b/lib/c-stack.c
+@@ -50,15 +50,8 @@
+ #if ! HAVE_STACK_T && ! defined stack_t
+ typedef struct sigaltstack stack_t;
+ #endif
+-#ifndef SIGSTKSZ
+-# define SIGSTKSZ 16384
+-#elif HAVE_LIBSIGSEGV && SIGSTKSZ < 16384
+-/* libsigsegv 2.6 through 2.8 have a bug where some architectures use
+-   more than the Linux default of an 8k alternate stack when deciding
+-   if a fault was caused by stack overflow.  */
+-# undef SIGSTKSZ
+-# define SIGSTKSZ 16384
+-#endif
++#undef SIGSTKSZ
++#define SIGSTKSZ 16384
+ 
+ #include <stdlib.h>
+ #include <string.h>
+diff --git a/lib/freadahead.c b/lib/freadahead.c
+--- a/lib/freadahead.c
++++ b/lib/freadahead.c
+@@ -22,10 +22,16 @@
+ #include <stdlib.h>
+ #include "stdio-impl.h"
+ 
++/* On glibc >= 2.28, _IO_IN_BACKUP is no longer in public headers.  */
++#if defined __GLIBC__ && !defined _IO_IN_BACKUP
++# define _IO_IN_BACKUP 0x100
++#endif
++
+ size_t
+ freadahead (FILE *fp)
+ {
+-#if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 /* GNU libc, BeOS, Haiku, Linux libc5 */
++#if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 \
++    || defined __GLIBC__ /* GNU libc, BeOS, Haiku, Linux libc5 */
+   if (fp->_IO_write_ptr > fp->_IO_write_base)
+     return 0;
+   return (fp->_IO_read_end - fp->_IO_read_ptr)
+diff --git a/lib/fseeko.c b/lib/fseeko.c
+--- a/lib/fseeko.c
++++ b/lib/fseeko.c
+@@ -47,7 +47,8 @@
+ #endif
+ 
+   /* These tests are based on fpurge.c.  */
+-#if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 /* GNU libc, BeOS, Haiku, Linux libc5 */
++#if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 \
++    || defined __GLIBC__ /* GNU libc, BeOS, Haiku, Linux libc5 */
+   if (fp->_IO_read_end == fp->_IO_read_ptr
+       && fp->_IO_write_ptr == fp->_IO_write_base
+       && fp->_IO_save_base == NULL)
+@@ -121,7 +122,8 @@
+           return -1;
+         }
+ 
+-#if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 /* GNU libc, BeOS, Haiku, Linux libc5 */
++#if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 \
++    || defined __GLIBC__ /* GNU libc, BeOS, Haiku, Linux libc5 */
+       fp->_flags &= ~_IO_EOF_SEEN;
+       fp->_offset = pos;
+ #elif defined __sferror || defined __DragonFly__ /* FreeBSD, NetBSD, OpenBSD, DragonFly, Mac OS X, Cygwin */

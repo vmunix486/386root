@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-SYSLINUX_VERSION = 6.03
+SYSLINUX_VERSION = 4.07
 SYSLINUX_SOURCE = syslinux-$(SYSLINUX_VERSION).tar.xz
 SYSLINUX_SITE = $(BR2_KERNEL_MIRROR)/linux/utils/boot/syslinux
 
@@ -38,8 +38,8 @@ SYSLINUX_EFI_ARGS = \
 endif # EFI
 
 # The syslinux tarball comes with pre-compiled binaries.
-# Since timestamps might not be in the correct order, a rebuild is
-# not always triggered for all the different images.
+# Since timestamps might not be in the correct order, a rebuild
+# is not always triggered for all the different images.
 # Cleanup the mess even before we attempt a build, so we indeed
 # build everything from source.
 define SYSLINUX_CLEANUP
@@ -47,36 +47,73 @@ define SYSLINUX_CLEANUP
 endef
 SYSLINUX_POST_PATCH_HOOKS += SYSLINUX_CLEANUP
 
-# syslinux build system has no convenient way to pass CFLAGS,
-# and the internal zlib should take precedence so -I shouldn't
-# be used.
+# Syslinux's mk/syslinux.mk hardcodes "CC = gcc" which overrides
+# command-line CC. Change to ?= so our CC takes precedence.
+define SYSLINUX_FIXUP_CC
+	$(SED) 's/^CC\t= gcc/CC\t?= gcc/' $(@D)/mk/syslinux.mk
+endef
+SYSLINUX_POST_PATCH_HOOKS += SYSLINUX_FIXUP_CC
+
+# GCC 14+ is stricter about implicit declarations, implicit int,
+# incompatible pointer types, and fallthrough. Also needs -fcommon
+# for tentative global definitions, and -std=gnu89 to avoid
+# variable-length array errors in ACC compile-time assert macros.
+SYSLINUX_GCC14_CC = $(HOSTCC) -std=gnu89 \
+	-Wno-implicit-function-declaration \
+	-Wno-implicit-int \
+	-Wno-int-conversion \
+	-Wno-incompatible-pointer-types \
+	-Wno-implicit-fallthrough \
+	-fcommon
+
+ifeq ($(BR2_TARGET_SYSLINUX_LEGACY_BIOS),y)
+# Build only what we need: com32 libs, lzo, core (boot loader), memdisk,
+# modules, mbr, libinstaller, and the extlinux installer.
+# Skip gpxe (network boot), diag, dos, win32/win64, dosutil.
 define SYSLINUX_BUILD_CMDS
-	$(TARGET_MAKE_ENV) $(MAKE1) CC="$(HOSTCC) -idirafter $(HOST_DIR)/usr/include $(HOST_LDFLAGS)" \
-		AR="$(HOSTAR)" $(SYSLINUX_EFI_ARGS) -C $(@D) $(SYSLINUX_TARGET)
+	$(TARGET_MAKE_ENV) $(MAKE1) -C $(@D) \
+		CC="$(SYSLINUX_GCC14_CC)" \
+		AR="$(HOSTAR)" \
+		all-local
+	for i in codepage com32 lzo core memdisk modules mbr memdump \
+		 sample libinstaller linux extlinux utils; do \
+		$(TARGET_MAKE_ENV) $(MAKE1) -C $(@D)/$$i \
+			CC="$(SYSLINUX_GCC14_CC)" \
+			AR="$(HOSTAR)" \
+			all || exit 1; \
+	done
 endef
+endif
 
-# While the actual bootloader is compiled for the target, several
-# utilities for installing the bootloader are meant for the host.
-# Repeat the target, otherwise syslinux will try to build everything
-# Repeat CC and AR, since syslinux really wants to check them at
-# install time
+ifeq ($(BR2_TARGET_SYSLINUX_EFI),y)
+define SYSLINUX_BUILD_CMDS
+	$(TARGET_MAKE_ENV) $(MAKE1) -C $(@D) \
+		CC="$(SYSLINUX_GCC14_CC)" \
+		AR="$(HOSTAR)" \
+		$(SYSLINUX_EFI_ARGS) \
+		all
+endef
+endif
+
+# Syslinux 4.07: install manually to HOST_DIR
 define SYSLINUX_INSTALL_TARGET_CMDS
-	$(TARGET_MAKE_ENV) $(MAKE1) CC="$(HOSTCC) -idirafter $(HOST_DIR)/usr/include $(HOST_LDFLAGS)" \
-		AR="$(HOSTAR)" $(SYSLINUX_EFI_ARGS) INSTALLROOT=$(HOST_DIR) \
-		-C $(@D) $(SYSLINUX_TARGET) install
+	mkdir -p $(HOST_DIR)/usr/bin
+	$(INSTALL) -D -m 0755 $(@D)/mtools/syslinux $(HOST_DIR)/usr/bin/syslinux
+	mkdir -p $(HOST_DIR)/usr/sbin
+	$(INSTALL) -D -m 0755 $(@D)/extlinux/extlinux $(HOST_DIR)/usr/sbin/extlinux
+	mkdir -p $(HOST_DIR)/usr/share/syslinux
+	$(INSTALL) -D -m 0644 $(@D)/core/ldlinux.c32 $(HOST_DIR)/usr/share/syslinux/ldlinux.c32 2>/dev/null || true
 endef
 
-SYSLINUX_IMAGES-$(BR2_TARGET_SYSLINUX_ISOLINUX) += bios/core/isolinux.bin
-SYSLINUX_IMAGES-$(BR2_TARGET_SYSLINUX_PXELINUX) += bios/core/pxelinux.bin
-SYSLINUX_IMAGES-$(BR2_TARGET_SYSLINUX_MBR) += bios/mbr/mbr.bin
+SYSLINUX_IMAGES-$(BR2_TARGET_SYSLINUX_ISOLINUX) += core/isolinux.bin
+SYSLINUX_IMAGES-$(BR2_TARGET_SYSLINUX_PXELINUX) += core/pxelinux.bin
+SYSLINUX_IMAGES-$(BR2_TARGET_SYSLINUX_MBR) += mbr/mbr.bin
 SYSLINUX_IMAGES-$(BR2_TARGET_SYSLINUX_EFI) += $(SYSLINUX_EFI_BITS)/efi/syslinux.efi
 
 SYSLINUX_C32 = $(call qstrip,$(BR2_TARGET_SYSLINUX_C32))
 
-# We install the c32 modules from the host-installed tree, where they
-# are all neatly installed in a single location, while they are
-# scattered around everywhere in the build tree.
 define SYSLINUX_INSTALL_IMAGES_CMDS
+	mkdir -p $(BINARIES_DIR)/syslinux
 	for i in $(SYSLINUX_IMAGES-y); do \
 		$(INSTALL) -D -m 0755 $(@D)/$$i $(BINARIES_DIR)/syslinux/$${i##*/}; \
 	done

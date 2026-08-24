@@ -92,7 +92,8 @@ HOST_GCC_COMMON_CONF_OPTS = \
 # Don't build documentation. It takes up extra space / build time,
 # and sometimes needs specific makeinfo versions to work
 HOST_GCC_COMMON_CONF_ENV = \
-	MAKEINFO=missing
+	MAKEINFO=missing \
+	CXXFLAGS="$(HOST_CXXFLAGS) -std=gnu++14"
 
 GCC_COMMON_TARGET_CFLAGS = $(TARGET_CFLAGS)
 GCC_COMMON_TARGET_CXXFLAGS = $(TARGET_CXXFLAGS)

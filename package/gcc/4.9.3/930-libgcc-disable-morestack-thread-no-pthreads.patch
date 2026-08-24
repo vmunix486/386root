@@ -1,0 +1,9 @@
+diff --git a/libgcc/config/t-stack b/libgcc/config/t-stack
+--- a/libgcc/config/t-stack
++++ b/libgcc/config/t-stack
+@@ -1,4 +1,4 @@
+ # Makefile fragment to provide generic support for -fsplit-stack.
+ # This should be used in config.host for any host which supports
+ # -fsplit-stack.
+-LIB2ADD_ST += $(srcdir)/generic-morestack.c $(srcdir)/generic-morestack-thread.c
++LIB2ADD_ST += $(srcdir)/generic-morestack.c

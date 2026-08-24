@@ -36,6 +36,7 @@ HOST_UTIL_LINUX_DEPENDENCIES = host-pkgconf
 
 # We also don't want the host-python dependency
 HOST_UTIL_LINUX_CONF_OPTS = --without-python
+HOST_UTIL_LINUX_CONF_ENV = CFLAGS="$(HOST_CFLAGS) -include sys/sysmacros.h"
 
 # If both util-linux and busybox are selected, make certain util-linux
 # wins the fight over who gets to have their utils actually installed
