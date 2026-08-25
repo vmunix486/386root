@@ -1,0 +1,3 @@
+#!/bin/sh
+# Disabled - no longer waits for interfaces to appear
+exit 0

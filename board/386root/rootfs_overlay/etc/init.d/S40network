@@ -1,0 +1,4 @@
+#!/bin/sh
+# Networking is not started automatically.
+# Bring it up manually with: ifup eth0
+exit 0
