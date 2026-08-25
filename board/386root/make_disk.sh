@@ -4,7 +4,7 @@
 #
 # Usage: sudo board/386root/make_disk.sh [buildroot_dir]
 
-set -ex
+#set -ex
 
 TOPDIR="${1:-.}"
 BINARIES="${TOPDIR}/output/images"
