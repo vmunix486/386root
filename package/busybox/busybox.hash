@@ -1,3 +1,2 @@
-# From http://busybox.net/downloads/busybox-1.24.1.tar.bz2.sign
-md5 be98a40cadf84ce2d6b05fa41a275c6a  busybox-1.24.1.tar.bz2
-sha1 157d14d24748b4505b1a418535688706a2b81680  busybox-1.24.1.tar.bz2
+# From https://busybox.net/downloads/busybox-1.36.1.tar.bz2
+sha256	b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314	busybox-1.36.1.tar.bz2

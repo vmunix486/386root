@@ -4,11 +4,11 @@
 #
 ################################################################################
 
-ZLIB_VERSION = 1.2.8
+ZLIB_VERSION = 1.3.2
 ZLIB_SOURCE = zlib-$(ZLIB_VERSION).tar.xz
-ZLIB_SITE = http://downloads.sourceforge.net/project/libpng/zlib/$(ZLIB_VERSION)
-ZLIB_LICENSE = zlib license
-ZLIB_LICENSE_FILES = README
+ZLIB_SITE = https://zlib.net/fossils
+ZLIB_LICENSE = Zlib
+ZLIB_LICENSE_FILES = LICENSE
 ZLIB_INSTALL_STAGING = YES
 
 # It is not possible to build only a shared version of zlib, so we build both
